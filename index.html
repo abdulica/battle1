@@ -178,7 +178,7 @@ function getProf(l) { return Math.ceil(l/4)+1; }
 class Hero {
     constructor(n){this.name=n;this.stats={str:10,dex:10,con:10,int:10,wis:10,cha:10};this.lvl=1;this.xp=0;this.xpNext=1000;
     this.equip={sword:null,bow:null,shield:null,armor:null,boots:null,helmet:null,ring1:null,ring2:null,amulet:null};
-    this.maxHp=10;this.curHp=10;this.ac=10;}
+        this.maxHp=10;this.curHp=10;this.ac=14;}
     recalc(){
         let cM=calcMod(this.stats.con),dM=calcMod(this.stats.dex),sM=calcMod(this.stats.str),wM=calcMod(this.stats.wis);
         this.maxHp=10+cM*this.lvl;let hpB=0,acB=0;let res={fire:0,cold:0,elec:0};
@@ -188,7 +188,7 @@ class Hero {
             if(i.bonus.type==='resistance'&&i.bonus.resType)res[i.bonus.resType]+=i.bonus.value;}}
         let eAc=0;if(this.equip.armor)eAc+=this.equip.armor.bonus?.value||0;
         if(this.equip.shield)eAc+=this.equip.shield.bonus?.value||0;
-        this.ac=10+dM+eAc+acB;this.maxHp+=hpB;this.res=res;this.dM=dM;this.wM=wM;this.sM=sM;this.cM=cM;this.iM=calcMod(this.stats.int);this.chM=calcMod(this.stats.cha);}
+        this.ac=14;this.maxHp+=hpB;this.res=res;this.dM=dM;this.wM=wM;this.sM=sM;this.cM=cM;this.iM=calcMod(this.stats.int);this.chM=calcMod(this.stats.cha);}
     getAtk(){let p=getProf(this.lvl);let w=this.equip.sword||this.equip.bow;let m=w&&w.type==='bow'?this.dM:this.sM;return p+m;}
     getDmg(){let w=this.equip.sword||this.equip.bow;if(!w)return{d:4,m:this.sM};return{d:getDieValue(w.damageDie||'d4'),m:w.type==='bow'?this.dM:this.sM};}
     addXp(a){this.xp+=a;while(this.xp>=this.xpNext){this.xp-=this.xpNext;this.lvl++;this.xpNext=Math.floor(this.xpNext*2);let h=Dice.roll(10)+calcMod(this.stats.con);this.maxHp+=Math.max(1,h);this.curHp=Math.min(this.curHp,this.maxHp);}}
@@ -204,14 +204,14 @@ class Enemy extends Hero {
         this.xp=0;
         this.xpNext=Math.floor(100*Math.pow(1.5,l-1));
         this.stats={str:8+Dice.roll(6)+Math.floor(l/2),dex:8+Dice.roll(6)+Math.floor(l/2),con:8+Dice.roll(6)+Math.floor(l/2),int:8+Dice.roll(6),wis:8+Dice.roll(6),cha:8+Dice.roll(6)};
-        if(Dice.roll(2)===1)this.equip.sword={type:'sword',name:'Sword',damageDie:'d8',bonus:{type:'damage',value:Math.floor(this.lvl/3)},lvl:0};
-        else this.equip.bow={type:'bow',name:'Bow',damageDie:'d6',bonus:{type:'damage',value:Math.floor(this.lvl/3)},lvl:0};
-        if(Dice.roll(2)===1)this.equip.armor={type:'armor',name:'Armor',bonus:{type:'ac',value:Math.floor(this.lvl/4)+1},lvl:0};
-        if(Dice.roll(2)===1)this.equip.shield={type:'shield',name:'Shield',bonus:{type:'ac',value:Math.floor(this.lvl/5)+1},lvl:0};
+        this.equip.sword={type:'sword',name:'Sword',damageDie:'d8',bonus:{type:'damage',value:Math.floor(this.lvl/3)},lvl:0};
+        this.equip.shield={type:'shield',name:'Shield',bonus:{type:'ac',value:Math.floor(this.lvl/5)+1},lvl:0};
         this.recalc();
         this.maxHp = gs.h.maxHp;
         this.curHp = this.maxHp;
+        this.ac = 14;
     }
+    getAtk(){return gs.h.getAtk();}
 }
 class Battle {
     constructor(h,e,log,upd){this.h=h;this.e=e;this.log=log;this.upd=upd;this.t=1;this.pt=true;this.over=false;this.heroHealCount=1;this.enemyHealCount=1;this.autoRunning=false;this.stopAuto=false;}
