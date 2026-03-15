@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hero vs Hero RPG</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #eee; }
+#preload-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a1a; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+#preload-screen h1 { color: #f0c040; margin-bottom: 20px; }
+.loading-bar { width: 300px; height: 20px; background: #222; border-radius: 10px; overflow: hidden; margin-bottom: 15px; }
+#loading-fill { height: 100%; background: linear-gradient(90deg, #f0c040, #d4a030); width: 0%; transition: width 0.3s; }
+#loading-text { color: #888; font-size: 14px; }
+#app { max-width: 900px; margin: 0 auto; padding: 20px; }
+.card { background: #0f0f23; border: 2px solid #3a3a5c; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.card-header h2 { color: #f0c040; }
+.hp-bar, .xp-bar { background: #222; height: 24px; border-radius: 12px; margin: 8px 0; position: relative; overflow: hidden; }
+.hp-fill { background: linear-gradient(90deg, #e74c3c, #c0392b); height: 100%; transition: width 0.3s; }
+.xp-fill { background: linear-gradient(90deg, #3498db, #2980b9); height: 100%; transition: width 0.3s; }
+.hp-text, .xp-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+.stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 15px 0; }
+.stat { background: #1a1a3a; padding: 10px; border-radius: 8px; text-align: center; }
+.stat span { display: block; font-size: 10px; color: #888; }
+.stat b { display: block; font-size: 18px; color: #f0c040; }
+.stat small { color: #4ade80; font-size: 12px; }
+.equipment { background: #1a1a3a; padding: 15px; border-radius: 8px; margin-top: 15px; }
+.equipment h3 { color: #f0c040; margin-bottom: 10px; }
+.equip-slot { padding: 5px 10px; font-size: 14px; color: #aaa; border-bottom: 1px solid #2a2a4a; }
+.actions { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+.actions button { flex: 1; min-width: 120px; padding: 12px 20px; background: linear-gradient(135deg, #f0c040, #d4a030); border: none; border-radius: 8px; color: #1a1a2e; font-weight: bold; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+.actions button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(240,192,64,0.4); }
+.battle-container { display: flex; align-items: flex-start; justify-content: center; gap: 15px; margin: 0 auto; }
+.sprite-container { width: 100px; height: 100px; margin: 0 auto; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+.battle-arena { display: flex; justify-content: space-between; align-items: flex-end; gap: 30px; border: 4px solid #555; border-radius: 8px; padding: 180px 300px; background: url('background/Dungeon-door-skull.png') center/cover no-repeat #111; position: relative; }
+.battle-grid { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); pointer-events: none; }
+.grid-cell { border: 1px dashed rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgba(255,255,255,0.5); }
+.sprite-container { width: 100px; height: 100px; margin: 0 auto; position: relative; }
+.sprite { width: 100px; height: 100px; image-rendering: pixelated; }
+.battle-arena .sprite-container { transform: scale(1); margin: 0; }
+.battle-arena .enemy-container { transform: scale(1) scaleX(-1); }
+.hero-container {  }
+
+.enemy-container {  }
+#app { max-width: 100%; margin: 0 auto; padding: 20px; text-align: center; }
+.battle-container { display: flex; align-items: flex-start; justify-content: center; gap: 15px; margin: 0 auto; }
+.fighter-info { text-align: center; min-width: 100px; }
+.fighter-info.hero-info { text-align: left; margin-right: auto; }
+.fighter-info.enemy-info { text-align: right; margin-left: auto; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.shake { animation: shake 0.3s ease-in-out; }
+@keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.flash { animation: flash 0.2s ease-in-out; }
+@keyframes parry { 0%, 100% { transform: scale(1.5) scaleX(-1) rotate(0deg); } 25% { transform: scale(1.5) scaleX(-1) rotate(-15deg); } 75% { transform: scale(1.5) scaleX(-1) rotate(15deg); } }
+.enemy-container.parry { animation: parry 0.3s ease-in-out; }
+@keyframes parryHero { 0%, 100% { transform: scale(1.5) rotate(0deg); } 25% { transform: scale(1.5) rotate(-15deg); } 75% { transform: scale(1.5) rotate(15deg); } }
+.hero-container.parry { animation: parryHero 0.3s ease-in-out; }
+.stats-panel { background: #0f0f23; border: 2px solid #3a3a5c; border-radius: 8px; padding: 15px; min-width: 120px; }
+.hp-bar-visual { background: #222; height: 20px; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.hp-bar-visual div { background: linear-gradient(90deg, #e74c3c, #c0392b); height: 100%; transition: width 0.3s; }
+.stat-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #2a2a4a; }
+.stat-row span { color: #888; font-size: 12px; }
+.stat-row b { color: #f0c040; font-size: 14px; }
+.turn-frame { background: #1a1a3a; border: 3px solid #f0c040; border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: center; }
+.turn-indicator { font-size: 24px; font-weight: bold; color: #f0c040; text-shadow: 2px 2px 4px #000; }
+.hidden { display: none !important; }
+.loadout-section { margin: 20px 0; }
+.loadout-section h3 { color: #f0c040; margin-bottom: 10px; }
+.weapon-select { display: flex; gap: 10px; }
+.weapon-btn { flex: 1; padding: 15px; background: #1a1a3a; border: 2px solid #3a3a5c; border-radius: 8px; color: #aaa; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+.weapon-btn:hover { border-color: #f0c040; color: #fff; }
+.weapon-btn.selected { background: #f0c040; border-color: #f0c040; color: #1a1a2e; }
+.loadout-preview { background: #1a1a3a; padding: 15px; border-radius: 8px; margin: 15px 0; }
+.loadout-preview h3 { color: #f0c040; margin-bottom: 10px; }
+#battle-log { background: #0a0a1a; border: 2px solid #3a3a5c; border-radius: 8px; height: 200px; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 13px; line-height: 1.6; color: #aaa; margin-top: 15px; }
+#battle-actions { display: flex; flex-direction: column; gap: 8px; }
+#battle-actions button { width: 100%; }
+.enemy-actions { display: flex; flex-direction: column; gap: 8px; }
+.enemy-actions button { flex: 1; min-width: 120px; padding: 12px 20px; background: linear-gradient(135deg, #f0c040, #d4a030); border: none; border-radius: 8px; color: #1a1a2e; font-weight: bold; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+.enemy-actions button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(240,192,64,0.4); }
+#btn-auto { margin-top: 20px; background: linear-gradient(135deg, #e67e22, #d35400); }
+#btn-auto:hover { box-shadow: 0 4px 15px rgba(230,126,34,0.4); }
+</style>
+</head>
+<body>
+<div id="app">
+<div id="preload-screen">
+    <h1>Loading...</h1>
+    <div class="loading-bar"><div id="loading-fill"></div></div>
+    <p id="loading-text">Preparing sprites</p>
+</div>
+<div id="hero-card" class="card">
+<div class="card-header"><h2 id="hero-name">Hero</h2><span id="hero-level">Level 1</span></div>
+<div class="hp-bar"><div id="hp-fill"></div><span id="hp-text">10/10</span></div>
+<div class="xp-bar"><div id="xp-fill"></div><span id="xp-text">0/100 XP</span></div>
+<div class="stats-grid" id="stats-grid"></div>
+<div class="equipment" id="equipment"></div>
+<div class="actions"><button id="btn-prepare" onclick="showLoadout()">Prepare for Battle</button></div>
+</div>
+<div id="loadout-screen" class="hidden">
+<div class="card">
+<h2>Choose Your Loadout</h2>
+<div class="loadout-section">
+<h3>Combat Style</h3>
+<div class="weapon-select">
+<button id="btn-sword" class="weapon-btn selected" onclick="selectStyle('sword')">Sword + Shield</button>
+<button id="btn-bow" class="weapon-btn" onclick="selectStyle('bow')">Bow Only</button>
+</div>
+</div>
+<div class="loadout-preview">
+<h3>Stats Preview</h3>
+<div id="loadout-stats"></div>
+</div>
+<div class="actions">
+<button id="btn-start-battle" onclick="goToBattle()">Start Battle</button>
+<button id="btn-back" onclick="backToHero()">Back</button>
+</div>
+</div>
+</div>
+<div id="battle-area" class="hidden">
+<div class="turn-frame">
+    <div id="turn-indicator" class="turn-indicator"></div>
+</div>
+<div class="battle-container">
+<div id="battle-actions" class="actions hidden">
+<button id="btn-attack-sword" onclick="playerAction('attack_sword')">Hero Attack</button>
+<button id="btn-attack-bow" onclick="playerAction('attack_bow')">Bow Attack</button>
+<button id="btn-heal" onclick="playerAction('heal')">Hero Heal</button>
+<button id="btn-exit" onclick="endBattle()">Exit to Menu</button>
+</div>
+    <div id="hero-stats-panel" class="stats-panel">
+        <div class="hp-bar-visual"><div id="panel-hero-hp-fill"></div></div>
+        <div class="stat-row"><span>HP</span><b id="panel-hero-hp">100/100</b></div>
+        <div class="stat-row"><span>AC</span><b id="panel-hero-ac">14</b></div>
+        <div class="stat-row"><span>ATK</span><b id="panel-hero-atk">+4</b></div>
+        <div class="stat-row"><span>LVL</span><b id="panel-hero-lvl">1</b></div>
+        <div class="stat-row" id="panel-hero-heal"><span>HEAL</span><b>OK</b></div>
+    </div>
+    <div class="battle-arena">
+        <div class="battle-grid">
+            <div class="grid-cell">A1</div><div class="grid-cell">A2</div><div class="grid-cell">A3</div><div class="grid-cell">A4</div><div class="grid-cell">A5</div><div class="grid-cell">A6</div>
+            <div class="grid-cell">B1</div><div class="grid-cell">B2</div><div class="grid-cell">B3</div><div class="grid-cell">B4</div><div class="grid-cell">B5</div><div class="grid-cell">B6</div>
+            <div class="grid-cell">C1</div><div class="grid-cell">C2</div><div class="grid-cell">C3</div><div class="grid-cell">C4</div><div class="grid-cell">C5</div><div class="grid-cell">C6</div>
+            <div class="grid-cell">D1</div><div class="grid-cell">D2</div><div class="grid-cell">D3</div><div class="grid-cell">D4</div><div class="grid-cell">D5</div><div class="grid-cell">D6</div>
+            <div class="grid-cell">E1</div><div class="grid-cell">E2</div><div class="grid-cell">E3</div><div class="grid-cell">E4</div><div class="grid-cell">E5</div><div class="grid-cell">E6</div>
+            <div class="grid-cell">F1</div><div class="grid-cell">F2</div><div class="grid-cell">F3</div><div class="grid-cell">F4</div><div class="grid-cell">F5</div><div class="grid-cell">F6</div>
+            <div class="sprite-container hero-container" style="grid-row: 5; grid-column: 3; margin-right: -35px;">
+                <img id="hero-sprite" class="sprite" src="FreeKnight/png/Idle (1).png" alt="Hero">
+            </div>
+            <div class="sprite-container enemy-container" style="grid-row: 5; grid-column: 4; margin-left: -35px;">
+                <img id="enemy-sprite" class="sprite" src="FreeKnight/png/Idle (1).png" alt="Enemy">
+            </div>
+        </div>
+    </div>
+    <div id="enemy-stats-panel" class="stats-panel">
+        <div class="hp-bar-visual"><div id="panel-enemy-hp-fill"></div></div>
+        <div class="stat-row"><span>E-HP</span><b id="panel-enemy-hp">100/100</b></div>
+        <div class="stat-row"><span>E-AC</span><b id="panel-enemy-ac">12</b></div>
+        <div class="stat-row"><span>E-ATK</span><b id="panel-enemy-atk">+4</b></div>
+        <div class="stat-row"><span>E-LVL</span><b id="panel-enemy-lvl">1</b></div>
+        <div class="stat-row" id="panel-enemy-heal"><span>E-HEAL</span><b>OK</b></div>
+    </div>
+    <div id="enemy-actions" class="enemy-actions">
+        <button id="btn-enemy-attack" onclick="enemyAction()">Enemy Attack</button>
+        <button id="btn-enemy-heal" onclick="enemyHeal()">Enemy Heal</button>
+        <button id="btn-auto" onclick="autoBattle()">Auto Battle</button>
+    </div>
+</div>
+<div id="battle-log"></div>
+</div>
+</div>
+<script>
+const Dice = { roll: d => Math.floor(Math.random() * d) + 1, rollMultiple: (c, d) => { let t = 0, r = []; for(let i=0;i<c;i++){let x=Dice.roll(d);r.push(x);t+=x;} return {total:t,rolls:r}; } };
+function getDieValue(d) { return parseInt(d.replace('d','')); }
+function calcMod(s) { return Math.floor((s-10)/2); }
+function getProf(l) { return Math.ceil(l/4)+1; }
+class Hero {
+    constructor(n){this.name=n;this.stats={str:10,dex:10,con:10,int:10,wis:10,cha:10};this.lvl=1;this.xp=0;this.xpNext=1000;
+    this.equip={sword:null,bow:null,shield:null,armor:null,boots:null,helmet:null,ring1:null,ring2:null,amulet:null};
+    this.maxHp=10;this.curHp=10;this.ac=10;}
+    recalc(){
+        let cM=calcMod(this.stats.con),dM=calcMod(this.stats.dex),sM=calcMod(this.stats.str),wM=calcMod(this.stats.wis);
+        this.maxHp=10+cM*this.lvl;let hpB=0,acB=0;let res={fire:0,cold:0,elec:0};
+        for(let k in this.equip){let i=this.equip[k];if(i&&i.bonus){
+            if(i.bonus.type==='hp')hpB+=i.bonus.value;
+            if(i.bonus.type==='ac')acB+=i.bonus.value;
+            if(i.bonus.type==='resistance'&&i.bonus.resType)res[i.bonus.resType]+=i.bonus.value;}}
+        let eAc=0;if(this.equip.armor)eAc+=this.equip.armor.bonus?.value||0;
+        if(this.equip.shield)eAc+=this.equip.shield.bonus?.value||0;
+        this.ac=10+dM+eAc+acB;this.maxHp+=hpB;this.res=res;this.dM=dM;this.wM=wM;this.sM=sM;this.cM=cM;this.iM=calcMod(this.stats.int);this.chM=calcMod(this.stats.cha);}
+    getAtk(){let p=getProf(this.lvl);let w=this.equip.sword||this.equip.bow;let m=w&&w.type==='bow'?this.dM:this.sM;return p+m;}
+    getDmg(){let w=this.equip.sword||this.equip.bow;if(!w)return{d:4,m:this.sM};return{d:getDieValue(w.damageDie||'d4'),m:w.type==='bow'?this.dM:this.sM};}
+    addXp(a){this.xp+=a;while(this.xp>=this.xpNext){this.xp-=this.xpNext;this.lvl++;this.xpNext=Math.floor(this.xpNext*2);let h=Dice.roll(10)+calcMod(this.stats.con);this.maxHp+=Math.max(1,h);this.curHp=Math.min(this.curHp,this.maxHp);}}
+    lvlUp(){this.xp-=this.xpNext;this.lvl++;this.xpNext=Math.floor(this.xpNext*2);let h=Dice.roll(10)+calcMod(this.stats.con);this.maxHp+=Math.max(1,h);this.curHp=this.maxHp;}
+    dmg(a,t){if(t&&this.res[t])a=Math.max(0,a-this.res[t]);this.curHp=Math.max(0,this.curHp-a);return a;}
+    heal(a){this.curHp=Math.min(this.maxHp,this.curHp+a);}
+    get(){return{name:this.name,lvl:this.lvl,xp:this.xp,xpNext:this.xpNext,curHp:this.curHp,maxHp:this.maxHp,ac:this.ac,stats:this.stats,mods:{str:this.sM,dex:this.dM,con:this.cM,int:this.iM,wis:this.wM,cha:this.chM},equip:this.equip,atk:this.getAtk()};}
+}
+class Enemy extends Hero {
+    constructor(l){
+        super('Enemy'+l);
+        this.lvl=l;
+        this.xp=0;
+        this.xpNext=Math.floor(100*Math.pow(1.5,l-1));
+        this.stats={str:8+Dice.roll(6)+Math.floor(l/2),dex:8+Dice.roll(6)+Math.floor(l/2),con:8+Dice.roll(6)+Math.floor(l/2),int:8+Dice.roll(6),wis:8+Dice.roll(6),cha:8+Dice.roll(6)};
+        if(Dice.roll(2)===1)this.equip.sword={type:'sword',name:'Sword',damageDie:'d8',bonus:{type:'damage',value:Math.floor(this.lvl/3)},lvl:0};
+        else this.equip.bow={type:'bow',name:'Bow',damageDie:'d6',bonus:{type:'damage',value:Math.floor(this.lvl/3)},lvl:0};
+        if(Dice.roll(2)===1)this.equip.armor={type:'armor',name:'Armor',bonus:{type:'ac',value:Math.floor(this.lvl/4)+1},lvl:0};
+        if(Dice.roll(2)===1)this.equip.shield={type:'shield',name:'Shield',bonus:{type:'ac',value:Math.floor(this.lvl/5)+1},lvl:0};
+        this.recalc();
+        this.maxHp = gs.h.maxHp;
+        this.curHp = this.maxHp;
+    }
+}
+class Battle {
+    constructor(h,e,log,upd){this.h=h;this.e=e;this.log=log;this.upd=upd;this.t=1;this.pt=true;this.over=false;this.heroHealCount=1;this.enemyHealCount=1;this.autoRunning=false;this.stopAuto=false;}
+    async init(){
+        let hr=Dice.roll(20)+this.h.dM,er=Dice.roll(20)+this.e.dM;
+        this.log('--- BATTLE START ---');this.log('Initiative: '+this.h.name+': d20+'+this.h.dM+'='+hr);
+        this.log('Initiative: '+this.e.name+': d20+'+this.e.dM+'='+er);
+        this.pt=hr>=er;this.log(this.pt?this.h.name+' goes first!':this.e.name+' goes first!');this.upd();
+        if(!this.pt)await this.eTurn();}
+    atk(att,def,w){
+        let isHero = att === this.h;
+        let turnLabel = isHero ? "Hero's Turn" : "Enemy's Turn";
+        let an=isHero?this.h.name:this.e.name,dn=isHero?this.e.name:this.h.name;
+        let attacker = isHero ? 'hero' : 'enemy';
+        let defender = isHero ? 'enemy' : 'hero';
+        stopAnim(defender);
+        playAnim('idle', defender);
+        let ar=Dice.roll(20)+att.getAtk();
+        if(ar>=def.ac){
+            let di=att.getDmg();let dr=Dice.rollMultiple(1,di.d);let td=dr.total+di.m;
+            let ad=def.dmg(td);
+            this.log('\n'+turnLabel+': '+an+' attacks ('+w+') - Attack: d20+'+att.getAtk()+'='+ar+' | Hit: d'+di.d+'+'+di.m+'='+(dr.total+di.m)+' | Damage: '+td+' | '+dn+' HP: '+def.curHp+'/'+def.maxHp);
+            setTimeout(() => playAnim('attack', attacker, () => { stopAnim(attacker); playAnim('idle', attacker); }), 50);
+        }else{
+            this.log('\n'+turnLabel+': '+an+' attacks ('+w+') - <span style="color:#e74c3c">Missed! (d20+'+att.getAtk()+'='+ar+' vs AC:'+def.ac+')</span>');
+            setTimeout(() => playAnim('attack', attacker, () => { stopAnim(attacker); playAnim('idle', attacker); }), 50);
+        }
+        this.upd();
+    }
+    def(c){let isHero = c === this.h;let turnLabel = isHero ? "Hero's Turn" : "Enemy's Turn";this.log('\n'+turnLabel+': '+(isHero?this.h.name:this.e.name)+' defends');this.upd();}
+    heal(c){let isHero = c === this.h;let turnLabel = isHero ? "Hero's Turn" : "Enemy's Turn";let n=isHero?this.h.name:this.e.name;let am=8;c.heal(am);this.log('\n'+turnLabel+': '+n+' heals +'+am+' HP (HP:'+c.curHp+'/'+c.maxHp+')');this.upd();}
+    async play(a){if(!this.pt||this.over)return;
+        if(a==='attack_sword')this.atk(this.h,this.e,'Sword');
+        else if(a==='attack_bow')this.atk(this.h,this.e,'Bow');
+        else if(a==='defend')this.def(this.h);
+        else if(a==='heal'){
+            if(this.heroHealCount<=0){this.log('\nNo heals remaining!');}
+            else{this.heroHealCount--;this.heal(this.h);}
+        }
+        this.chk();if(!this.over){this.pt=false;this.upd();}}
+    eTurn(){if(this.over)return;this.pt=false;this.upd();}
+    async enemyAction(isAuto=false){if(!this||this.over||this.pt)return;let shouldHeal=isAuto&&this.e.curHp<this.e.maxHp*0.5;if(shouldHeal&&this.enemyHealCount>0){this.enemyHealCount--;this.heal(this.e);}else{this.atk(this.e,this.h,this.e.equip.bow?'Bow':'Sword');}this.chk();if(!this.over){this.t++;this.pt=true;this.upd();}}
+    enemyHeal(){if(!this||this.over||this.pt||this.enemyHealCount<=0)return;this.enemyHealCount--;this.heal(this.e);this.chk();if(!this.over){this.t++;this.pt=true;this.upd();}}
+    chk(){if(this.e.curHp<=0){this.over=true;this.log('\n🏆 '+this.h.name+' wins!');let x=this.e.lvl*50;this.log('\n'+x+' XP gained!');this.h.addXp(x);this.upd();}
+        else if(this.h.curHp<=0){this.over=true;this.log('\n💀 '+this.h.name+' defeated!');this.upd();}}
+    async auto(cb){this.autoRunning=true;this.stopAuto=false;while(!this.over&&!this.stopAuto){if(this.pt){let as=['attack_sword','attack_bow'];if(this.h.curHp<this.h.maxHp*0.25&&this.heroHealCount>0)as.push('heal');await this.play(as[Dice.roll(as.length)-1]);}else{await this.enemyAction(true);}await new Promise(r=>setTimeout(r,800));}this.autoRunning=false;if(cb)cb();}}
+let animState = { hero: 'idle', enemy: 'idle', heroFrame: 1, enemyFrame: 1 };
+const spriteAnimations = {
+    idle: { frames: 10, speed: 200, loop: true },
+    walk: { frames: 10, speed: 100, loop: true },
+    attack: { frames: 10, speed: 80, loop: false },
+    run: { frames: 10, speed: 80, loop: true },
+    dead: { frames: 10, speed: 200, loop: false }
+};
+let animIntervals = { hero: null, enemy: null };
+function playAnim(type, target, callback) {
+    const sprite = document.getElementById(target + '-sprite');
+    if (!sprite) return;
+    const anim = spriteAnimations[type];
+    if (!anim) return;
+    let frame = 1;
+    if (animIntervals[target]) clearInterval(animIntervals[target]);
+    sprite.src = 'FreeKnight/png/' + type + ' (' + frame + ').png';
+    animIntervals[target] = setInterval(() => {
+        frame++;
+        if (frame > anim.frames) {
+            if (anim.loop) {
+                frame = 1;
+            } else {
+                clearInterval(animIntervals[target]);
+                if (callback) callback();
+                return;
+            }
+        }
+        sprite.src = 'FreeKnight/png/' + type + ' (' + frame + ').png';
+    }, anim.speed);
+}
+function stopAnim(target) {
+    if (animIntervals[target]) clearInterval(animIntervals[target]);
+    const sprite = document.getElementById(target + '-sprite');
+    if (sprite) sprite.src = 'FreeKnight/png/Idle (1).png';
+}
+function shakeScreen(target) {
+    const container = document.querySelector('.' + target + '-container');
+    if (container) {
+        container.classList.add('shake');
+        setTimeout(() => container.classList.remove('shake'), 300);
+    }
+}
+function parryAnim(target) {
+    const container = document.querySelector('.' + target + '-container');
+    if (container) {
+        container.classList.add('parry');
+        setTimeout(() => container.classList.remove('parry'), 300);
+    }
+}
+var gs={h:null,e:null,b:null,inBattle:false,mode:'menu'};
+function initG(){gs.h=new Hero('Hero');gs.h.stats={str:14,dex:12,con:13,int:10,wis:10,cha:8};
+gs.h.equip.sword={type:'sword',name:'Iron Sword',damageDie:'d8',bonus:{type:'damage',value:0},lvl:0};
+gs.h.equip.shield={type:'shield',name:'Shield',bonus:{type:'ac',value:2},lvl:0};
+gs.h.equip.armor={type:'armor',name:'Leather Armor',bonus:{type:'ac',value:1},lvl:0};
+gs.h.equip.ring1={type:'ring1',name:'Ring',bonus:{type:'hp',value:5},lvl:0};gs.h.recalc();gs.h.curHp=gs.h.maxHp;}
+let selectedStyle = 'sword';
+function log(msg){const el=document.getElementById('battle-log');if(el){el.innerHTML+=msg+'<br>';el.scrollTop=el.scrollHeight;}}
+function updUI(){
+    let hd = gs.h.get();
+    // Main screen hero card
+    let hpP=hd.curHp/hd.maxHp*100;document.getElementById('hp-fill').style.width=hpP+'%';
+    document.getElementById('hp-text').innerText=hd.curHp+'/'+hd.maxHp;
+    let xpP=hd.xp/hd.xpNext*100;document.getElementById('xp-fill').style.width=xpP+'%';
+    document.getElementById('xp-text').innerText=hd.xp+'/'+hd.xpNext+' XP';
+    document.getElementById('hero-name').innerText=hd.name;
+    document.getElementById('hero-level').innerText='Level '+hd.lvl;
+    let sg=document.getElementById('stats-grid');sg.innerHTML='';
+    Object.keys(hd.stats).forEach(k=>{sg.innerHTML+='<div class=stat><span>'+k.toUpperCase().slice(0,3)+'</span><b>'+hd.stats[k]+'</b><small>'+(hd.mods[k]>=0?'+':'')+hd.mods[k]+'</small></div>';});
+    let eq=document.getElementById('equipment');eq.innerHTML='<h3>Equipment</h3>';
+    Object.keys(hd.equip).forEach(k=>{let it=hd.equip[k];eq.innerHTML+='<div class=equip-slot>'+k+': '+(it?it.name+' ('+(it.bonus?.value||0)+')':'None')+'</div>';});
+    // Battle stats panels
+    let ed = gs.e ? gs.e.get() : null;
+    if(gs.b && ed){
+        document.getElementById('panel-hero-hp').innerText = hd.curHp+'/'+hd.maxHp;
+        if(document.getElementById('panel-hero-hp-fill')) document.getElementById('panel-hero-hp-fill').style.width = (hd.curHp/hd.maxHp*100)+'%';
+        document.getElementById('panel-hero-ac').innerText = hd.ac;
+        document.getElementById('panel-hero-atk').innerText = '+'+hd.atk;
+        document.getElementById('panel-hero-lvl').innerText = hd.lvl;
+        let heroHealEl = document.getElementById('panel-hero-heal');
+        heroHealEl.querySelector('b').innerText = gs.b.heroHealCount;
+        document.getElementById('panel-enemy-hp').innerText = ed.curHp+'/'+ed.maxHp;
+        if(document.getElementById('panel-enemy-hp-fill')) document.getElementById('panel-enemy-hp-fill').style.width = (ed.curHp/ed.maxHp*100)+'%';
+        document.getElementById('panel-enemy-ac').innerText = ed.ac;
+        document.getElementById('panel-enemy-atk').innerText = '+'+ed.atk;
+        document.getElementById('panel-enemy-lvl').innerText = ed.lvl;
+        let enemyHealEl = document.getElementById('panel-enemy-heal');
+        enemyHealEl.querySelector('b').innerText = gs.b.enemyHealCount;
+    }
+    if(!gs.b) return;
+    // Battle area HP bars
+    if(document.getElementById('player-name')) document.getElementById('player-name').innerHTML=hd.name+' (L'+hd.lvl+')';
+    if(document.getElementById('player-stats')) document.getElementById('player-stats').innerHTML='AC: '+hd.ac;
+    if(document.getElementById('enemy-name')) document.getElementById('enemy-name').innerHTML=ed.name+' (L'+ed.lvl+')';
+    if(document.getElementById('enemy-stats')) document.getElementById('enemy-stats').innerHTML='AC: '+ed.ac;
+    let php=hd.curHp/hd.maxHp*100;
+    if(document.getElementById('player-hp-fill')){document.getElementById('player-hp-fill').style.width=php+'%';document.getElementById('player-hp-fill').className='hp-fill';}
+    if(document.getElementById('player-hp-text')) document.getElementById('player-hp-text').innerText=hd.curHp+'/'+hd.maxHp;
+    let ehp=ed.curHp/ed.maxHp*100;
+    if(document.getElementById('enemy-hp-fill')){document.getElementById('enemy-hp-fill').style.width=ehp+'%';document.getElementById('enemy-hp-fill').className='hp-fill';}
+    if(document.getElementById('enemy-hp-text')) document.getElementById('enemy-hp-text').innerText=ed.curHp+'/'+ed.maxHp;
+    // Turn indicator
+    let turnEl = document.getElementById('turn-indicator');
+    if(turnEl){
+        console.log('turnEl found, setting text');
+    }
+    let btns = document.querySelectorAll('#battle-actions button:not(#btn-exit)');
+    let healBtn = document.getElementById('btn-heal');
+    let enemyBtn = document.getElementById('btn-enemy-attack');
+    let enemyHealBtn = document.getElementById('btn-enemy-heal');
+    if(gs.b.pt && !gs.b.over){
+        turnEl.innerText = 'YOUR TURN';
+        turnEl.className = 'turn-indicator hero-turn';
+        btns.forEach(b => b.disabled = false);
+        if(gs.b.heroHealCount <= 0 && healBtn) healBtn.disabled = true;
+        if(enemyBtn) enemyBtn.disabled = true;
+        if(enemyHealBtn) enemyHealBtn.disabled = true;
+    }else if(!gs.b.over){
+        turnEl.innerText = 'ENEMY TURN';
+        turnEl.className = 'turn-indicator enemy-turn';
+        btns.forEach(b => b.disabled = true);
+        if(enemyBtn) enemyBtn.disabled = false;
+        if(enemyHealBtn) enemyHealBtn.disabled = gs.b.enemyHealCount <= 0;
+    }else{
+        if(enemyBtn) enemyBtn.disabled = true;
+        if(enemyHealBtn) enemyHealBtn.disabled = true;
+    }
+}
+function updateLoadoutPreview(){
+    let hero = gs.h;
+    let originalSword = hero.equip.sword;
+    let originalBow = hero.equip.bow;
+    let originalArmor = hero.equip.armor;
+    let originalShield = hero.equip.shield;
+    if(selectedStyle === 'sword'){
+        hero.equip.sword = {type:'sword',name:'Iron Sword',damageDie:'d8',bonus:{type:'damage',value:0},lvl:0};
+        hero.equip.bow = null;
+        hero.equip.shield = {type:'shield',name:'Shield',bonus:{type:'ac',value:2},lvl:0};
+        hero.equip.armor = {type:'armor',name:'Leather Armor',bonus:{type:'ac',value:1},lvl:0};
+    }else{
+        hero.equip.sword = null;
+        hero.equip.bow = {type:'bow',name:'Bow',damageDie:'d6',bonus:{type:'damage',value:0},lvl:0};
+        hero.equip.shield = null;
+        hero.equip.armor = {type:'armor',name:'Leather Armor',bonus:{type:'ac',value:1},lvl:0};
+    }
+    hero.recalc();
+    let d = hero.get();
+    document.getElementById('loadout-stats').innerHTML = 'HP: '+d.curHp+'/'+d.maxHp+'<br>AC: '+d.ac+'<br>Attack: +'+d.atk;
+    hero.equip.sword = originalSword;
+    hero.equip.bow = originalBow;
+    hero.equip.armor = originalArmor;
+    hero.equip.shield = originalShield;
+    hero.recalc();
+}
+function selectStyle(style){
+    selectedStyle = style;
+    document.getElementById('btn-sword').classList.toggle('selected', style==='sword');
+    document.getElementById('btn-bow').classList.toggle('selected', style==='bow');
+    updateLoadoutPreview();
+}
+function showLoadout(){
+    updateLoadoutPreview();
+    document.getElementById('hero-card').classList.add('hidden');
+    document.getElementById('loadout-screen').classList.remove('hidden');
+}
+function backToHero(){
+    document.getElementById('loadout-screen').classList.add('hidden');
+    document.getElementById('hero-card').classList.remove('hidden');
+}
+function goToBattle(){
+    if(selectedStyle === 'sword'){
+        gs.h.equip.sword = {type:'sword',name:'Iron Sword',damageDie:'d8',bonus:{type:'damage',value:0},lvl:0};
+        gs.h.equip.bow = null;
+        gs.h.equip.shield = {type:'shield',name:'Shield',bonus:{type:'ac',value:2},lvl:0};
+        gs.h.equip.armor = {type:'armor',name:'Leather Armor',bonus:{type:'ac',value:1},lvl:0};
+    }else{
+        gs.h.equip.sword = null;
+        gs.h.equip.bow = {type:'bow',name:'Bow',damageDie:'d6',bonus:{type:'damage',value:0},lvl:0};
+        gs.h.equip.shield = null;
+        gs.h.equip.armor = {type:'armor',name:'Leather Armor',bonus:{type:'ac',value:1},lvl:0};
+    }
+    gs.h.recalc();
+    gs.h.curHp = gs.h.maxHp;
+    startBattle();
+}
+async function startBattle(){
+    gs.h.curHp = 100;
+    gs.h.maxHp = 100;
+    let enemyLvl=Math.max(1,gs.h.lvl+Dice.roll(3)-2);gs.e=new Enemy(enemyLvl);
+gs.b=new Battle(gs.h,gs.e,log,updUI);gs.inBattle=true;
+document.getElementById('loadout-screen').classList.add('hidden');
+document.getElementById('battle-area').classList.remove('hidden');
+document.getElementById('battle-actions').classList.remove('hidden');
+document.getElementById('battle-log').innerHTML='';
+    document.getElementById('btn-attack-sword').style.display = gs.h.equip.sword ? 'block' : 'none';
+    document.getElementById('btn-attack-bow').style.display = gs.h.equip.bow ? 'block' : 'none';
+    let healBtn = document.getElementById('btn-heal');
+    if(healBtn) healBtn.disabled = false;
+    playAnim('idle', 'hero');
+    playAnim('idle', 'enemy');
+await gs.b.init();updUI();}
+async function playerAction(a){if(!gs.b||gs.b.over)return;await gs.b.play(a);}
+function enemyAction(){if(!gs.b||gs.b.over||gs.b.pt)return;gs.b.enemyAction(false);}
+function enemyHeal(){if(!gs.b||gs.b.over||gs.b.pt)return;gs.b.enemyHeal();}
+async function autoBattle(){
+    if(gs.b.autoRunning){
+        gs.b.stopAuto = true;
+    }else{
+        document.getElementById('btn-auto').innerText = 'Stop Auto';
+        document.getElementById('btn-auto').style.background = 'linear-gradient(135deg, #27ae60, #1e8449)';
+        document.getElementById('btn-attack-sword').style.opacity = '0.5';
+        document.getElementById('btn-attack-bow').style.opacity = '0.5';
+        document.getElementById('btn-heal').style.opacity = '0.5';
+        document.getElementById('btn-enemy-attack').style.opacity = '0.5';
+        document.getElementById('btn-enemy-heal').style.opacity = '0.5';
+        await gs.b.auto(()=>{
+            document.getElementById('btn-auto').innerText = 'Auto Battle';
+            document.getElementById('btn-auto').style.background = 'linear-gradient(135deg, #e67e22, #d35400)';
+            document.getElementById('btn-attack-sword').style.opacity = '1';
+            document.getElementById('btn-attack-bow').style.opacity = '1';
+            document.getElementById('btn-heal').style.opacity = '1';
+            document.getElementById('btn-enemy-attack').style.opacity = '1';
+            document.getElementById('btn-enemy-heal').style.opacity = '1';
+        });
+    }
+}
+function endBattle(){gs.inBattle=false;gs.b=null;document.getElementById('battle-area').classList.add('hidden');
+document.getElementById('hero-card').classList.remove('hidden');
+document.getElementById('battle-actions').classList.remove('hidden');
+document.getElementById('btn-auto').innerText = 'Auto Battle';
+document.getElementById('btn-auto').style.background = 'linear-gradient(135deg, #e67e22, #d35400)';
+stopAnim('hero');stopAnim('enemy');updUI();}
+function preloadSprites(){
+    return new Promise((resolve) => {
+        const types = ['idle', 'attack', 'walk', 'run', 'dead'];
+        const frames = [1,2,3,4,5,6,7,8,9,10];
+        const total = types.length * frames.length;
+        let loaded = 0;
+        
+        const updateProgress = () => {
+            loaded++;
+            const percent = (loaded / total) * 100;
+            document.getElementById('loading-fill').style.width = percent + '%';
+            document.getElementById('loading-text').innerText = 'Loading sprites... ' + loaded + '/' + total;
+            if (loaded >= total) {
+                setTimeout(() => {
+                    document.getElementById('preload-screen').style.display = 'none';
+                    resolve();
+                }, 500);
+            }
+        };
+        
+        types.forEach(type => {
+            frames.forEach(frame => {
+                const img = new Image();
+                img.onload = updateProgress;
+                img.onerror = updateProgress;
+                img.src = 'FreeKnight/png/' + type + ' (' + frame + ').png';
+            });
+        });
+        
+        if (total === 0) resolve();
+    });
+}
+preloadSprites().then(() => {
+    initG();updUI();
+});
+</script>
+</body>
+</html>
